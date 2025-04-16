@@ -20,6 +20,8 @@ def create_app():
     migrate.init_app(app, db)
 
     from app.routes import sensor_routes
+    from app.routes import cam_routes
     app.register_blueprint(sensor_routes.sensor_bp)
+    app.register_blueprint(cam_routes.cam_bp)
 
     return app

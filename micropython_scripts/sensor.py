@@ -17,6 +17,9 @@ tempLabel = None
 pressureLabel = None
 humidityLabel = None
 
+# Device ID (unique for each device)
+DEVICE_ID = "sensor_device_1"  # Change for second device
+
 # WiFi:
 SSID = "Karan"
 PASSWORD = "qwer1234"
@@ -46,6 +49,7 @@ def setup():
 
 def send_data(temperature, humidity, pressure):
     data = {
+        "device_id": DEVICE_ID,  # Include device ID
         "temperature": temperature,
         "humidity": humidity,
         "pressure": pressure
@@ -67,22 +71,22 @@ def loop():
             humidity = env3_0.read_humidity()
             pressure = env3_0.read_pressure()
   
-            print(f"Temperature: {temp}°C, Humidity: {humidity}%, Pressure: {pressure} hPa")
+            print(f"[{DEVICE_ID}] Temperature: {temp}°C, Humidity: {humidity}%, Pressure: {pressure} hPa")
 
             # Update M5Stack screen
             Widgets.fillScreen(0x222222)  # Clear screen
-
+            
+            device_info = f"Device: {DEVICE_ID}"
             temp_hehe = f"Temperature: {temp} C"
             humid_hehe = f"Humidity: {humidity}%"
             pressure_hehe = f"Pressure: {pressure} hPa"
             
+            deviceLabel = Widgets.Label(device_info, 10, 10, 1.0, 0xffffff, 0x222222, Widgets.FONTS.DejaVu18)
             tempLabel = Widgets.Label(temp_hehe, 10, 50, 1.0, 0xffffff, 0x222222, Widgets.FONTS.DejaVu18)
             humidityLabel = Widgets.Label(humid_hehe, 10, 100, 1.0, 0xffffff, 0x222222, Widgets.FONTS.DejaVu18)
             pressureLabel = Widgets.Label(pressure_hehe, 10, 150, 1.0, 0xffffff, 0x222222, Widgets.FONTS.DejaVu18)
 
-            # Widgets.print(f"Temp: {temp}°C\nHumidity: {humidity}%\nPressure: {pressure} hPa")
-
-            M5.update()  # <- Add this back if you're displaying data on the screen
+            M5.update()
 
             # Send data to Flask backend
             send_data(temp, humidity, pressure)
