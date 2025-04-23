@@ -68,7 +68,7 @@ def recieve_sensor_data():
             response_data["fire_hazard_reason"] = fire_hazard_reason
 
             try:
-                camera_response = requests.get("http://192.168.151.112:5000/api/devices/camera")
+                camera_response = requests.get("http://192.168.26.112:5000/api/devices/camera")
                 if camera_response.status_code == 200:
                     camera_info = camera_response.json()
                     camera_ip = camera_info.get("ip_address")
@@ -81,7 +81,7 @@ def recieve_sensor_data():
                                 response_data["camera_triggered"] = "direct"
                             else:
                                 trigger_response = requests.post(
-                                    "http://192.168.151.112:5000/api/trigger_camera",
+                                    "http://192.168.26.112:5000/api/trigger_camera",
                                     json={
                                         "device_id": device_id,
                                         "reason": "fire_hazard",
@@ -94,7 +94,7 @@ def recieve_sensor_data():
                                 response_data["camera_response"] = trigger_response.text
                         except:
                             trigger_response = requests.post(
-                                    "http://192.168.151.112:5000/api/trigger_camera",
+                                    "http://192.168.26.112:5000/api/trigger_camera",
                                     json={
                                         "device_id": device_id,
                                         "reason": "fire_hazard",
@@ -107,7 +107,7 @@ def recieve_sensor_data():
                             response_data["camera_response"] = trigger_response.text
                     else:
                         trigger_response = requests.post(
-                                    "http://192.168.151.112:5000/api/trigger_camera",
+                                    "http://192.168.26.112:5000/api/trigger_camera",
                                     json={
                                         "device_id": device_id,
                                         "reason": "fire_hazard",
