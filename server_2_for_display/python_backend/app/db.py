@@ -1,8 +1,17 @@
 import os
-import psycopg2
+from psycopg2 import pool
 from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_connection():
-    return psycopg2.connect(os.getenv("postgresql://neondb_owner:npg_7nIju6qeckMx@ep-ancient-grass-a1sf9huw-pooler.ap-southeast-1.aws.neon.tech/IoT?sslmode=require"), sslmode='require')
+db_pool = pool.SimpleConnectionPool(
+    minconn=1,
+    maxconn=10,
+    dsn=os.getenv("DATABASE_URL")
+)
+
+def get_conn():
+    return db_pool.getconn()
+
+def return_conn(conn):
+    db_pool.putconn(conn)
