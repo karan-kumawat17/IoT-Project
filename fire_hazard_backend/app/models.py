@@ -15,13 +15,15 @@ class SensorData(db.Model):
 
 
 class ImageData(db.Model):
+    __tablename__ = 'image_data'
     id = db.Column(db.Integer, primary_key=True)
     device_id = db.Column(db.String(50), nullable=False)
     filename = db.Column(db.String(255), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     filepath = db.Column(db.String(255), nullable=False)
+    image_binary = db.Column(db.LargeBinary, nullable=False)
     sensor_data_id = db.Column(db.Integer, db.ForeignKey('sensor_data.id'), nullable=True)
-
+    is_fire_hazard = db.Column(db.Boolean, default=False)
     # Define relationship with SensorData
     sensor_data = db.relationship('SensorData', backref=db.backref('images', lazy=True))
 
