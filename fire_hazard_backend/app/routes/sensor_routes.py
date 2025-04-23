@@ -1,8 +1,16 @@
 from flask import Blueprint, request, jsonify
 from app import db
 from app.models import SensorData
+import datetime
+import requests
 
 sensor_bp = Blueprint('sensor_bp', __name__)
+
+TEMP_THRESHOLD = 35.0
+TEMP_RISE_THRESHOLD = 5.0
+TEMP_WINDOW = 60  # seconds
+
+temp_history = {}
 
 @sensor_bp.route('/api/sensor', methods=['POST'])
 def recieve_sensor_data():
@@ -13,6 +21,7 @@ def recieve_sensor_data():
             return jsonify({"error": "Invalid data"}), 400
         
         device_id = data.get("device_id", "unknown_device")
+        temperature = data["temperature"]
 
         # Store Data in Neon SQL
         sensor_entry = SensorData(
@@ -24,7 +33,95 @@ def recieve_sensor_data():
         db.session.add(sensor_entry)
         db.session.commit()
 
-        return jsonify({"message": "Data stored successfully!"}), 201
+        current_time = datetime.datetime.now().timestamp()
+        if device_id not in temp_history:
+            temp_history[device_id] = []
+
+        temp_history[device_id].append((current_time, temperature))
+
+        temp_history[device_id] = [
+            reading for reading in temp_history[device_id]
+            if current_time - reading[0] <= TEMP_WINDOW
+        ]
+
+        fire_hazard = False
+        fire_hazard_reason = None
+
+        if temperature >= TEMP_THRESHOLD:
+            fire_hazard = True
+            fire_hazard_reason = f"Temperature above threshold: {temperature}C >= {TEMP_THRESHOLD}C"
+            
+
+        if len(temp_history[device_id]) >= 2:
+            oldest_temp = temp_history[device_id][0][1]
+            if temperature - oldest_temp >= TEMP_RISE_THRESHOLD:
+                fire_hazard = True
+                fire_hazard_reason = f"Rapid temperature rise: {oldest_temp}C -> {temperature}C in {TEMP_WINDOW} seconds"
+
+        response_data = {
+            "message": "Data stored successfully!",
+            "sensor_data_id": sensor_entry.id
+        }
+
+        if fire_hazard:
+            response_data["fire_hazard"] = True
+            response_data["fire_hazard_reason"] = fire_hazard_reason
+
+            try:
+                camera_response = requests.get("http://192.168.151.112:5000/api/devices/camera")
+                if camera_response.status_code == 200:
+                    camera_info = camera_response.json()
+                    camera_ip = camera_info.get("ip_address")
+
+                    if camera_ip:
+                        try:
+                            fire_response = requests.get(f"http://{camera_ip}/firehazard", timeout=5)
+                            if fire_response.status_code == 200:
+                                response_data["camera_response"] = fire_response.text
+                                response_data["camera_triggered"] = "direct"
+                            else:
+                                trigger_response = requests.post(
+                                    "http://192.168.151.112:5000/api/trigger_camera",
+                                    json={
+                                        "device_id": device_id,
+                                        "reason": "fire_hazard",
+                                        "camera_device_id": camera_info.get("device_id")
+                                    },
+                                    headers={"Content-Type": "application/json"},
+                                    timeout=5
+                                )
+                                response_data["camera_triggered"] = "server"
+                                response_data["camera_response"] = trigger_response.text
+                        except:
+                            trigger_response = requests.post(
+                                    "http://192.168.151.112:5000/api/trigger_camera",
+                                    json={
+                                        "device_id": device_id,
+                                        "reason": "fire_hazard",
+                                        "camera_device_id": camera_info.get("device_id")
+                                    },
+                                    headers={"Content-Type": "application/json"},
+                                    timeout=5
+                                )
+                            response_data["camera_triggered"] = "server_fallback"
+                            response_data["camera_response"] = trigger_response.text
+                    else:
+                        trigger_response = requests.post(
+                                    "http://192.168.151.112:5000/api/trigger_camera",
+                                    json={
+                                        "device_id": device_id,
+                                        "reason": "fire_hazard",
+                                        "camera_device_id": camera_info.get("device_id")
+                                    },
+                                    headers={"Content-Type": "application/json"},
+                                    timeout=5
+                                )
+                        response_data["camera_triggered"] = "server_only"
+                        response_data["camera_response"] = trigger_response.text
+            except Exception as e:
+                response_data["camera_triggered_error"] = str(e)
+
+        return jsonify(response_data), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
@@ -90,3 +187,38 @@ def get_latest_sensor_data():
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+@sensor_bp.route('/api/thresholds', methods=['GET'])
+def get_thresholds():
+    return jsonify({
+        "temp_threshold": TEMP_THRESHOLD,
+        "temp_rise_threshold": TEMP_RISE_THRESHOLD,
+        "temp_window": TEMP_WINDOW
+    })
+
+
+@sensor_bp.route('/api/thresholds', methods=['POST'])
+def update_thresholds():
+    global TEMP_THRESHOLD, TEMP_RISE_THRESHOLD, TEMP_WINDOW
+
+    if not request.is_json:
+        return jsonify({"error": "Invalid data format"}), 400
+    
+    data = request.get_json()
+
+    if 'temp_threshold' in data:
+        TEMP_THRESHOLD = float(data['temp_threshold'])
+
+    if 'temp_rise_threshold' in data:
+        TEMP_RISE_THRESHOLD = float(data['temp_rise_threshold'])
+
+    if 'temp_window' in data:
+        TEMP_WINDOW = float(data['temp_window'])
+
+    return jsonify({
+        "message": "Thresholds updated successfully",
+        "temp_threshold": TEMP_THRESHOLD,
+        "temp_rise_threshold": TEMP_RISE_THRESHOLD,
+        "temp_window": TEMP_WINDOW
+    })
