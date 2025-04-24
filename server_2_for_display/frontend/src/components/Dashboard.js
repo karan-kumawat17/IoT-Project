@@ -45,9 +45,6 @@ function Dashboard() {
   return (
     <div style={{ padding: '20px', backgroundColor: '#f5f5f5' }}>
 
-      <Typography variant="h4" gutterBottom style={{ color: '#2c3e50', marginBottom: 30 }}>
-        Fire Detection Dashboard
-      </Typography>
 
       {/* <Card 
         style={{
